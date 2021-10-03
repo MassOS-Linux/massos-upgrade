@@ -31,9 +31,13 @@ The upgrade utility must be run as **root**. If logged in as a regular user, inv
 sudo ./massos-upgrade
 ```
 The utility will check for a new release of MassOS. If there is one, it will show you some details about the new version, and show a confirmation prompt as to whether you wish to upgrade or not. Answer with `y` to confirm and start the upgrade.
+
 ![](1.png)
+
 The utility will then proceed to download the upgrade package, prepare the upgrade, and then install the upgrade. As mentioned above, this may take a **very** long time with little to no output, so be extremely patient; the upgrade is still working!
+
 ![](2.png)
+
 ## After the upgrade completes
 After the upgrade finishes, you MUST reboot your system before doing anything further.
 ## Post-upgrade tips and notes
