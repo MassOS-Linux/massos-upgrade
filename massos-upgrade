@@ -1,0 +1,215 @@
+#!/bin/bash
+#
+# Release upgrade utility for MassOS.
+# Copyright (C) 2021 The Sonic Master.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# Ensure we are root.
+if [ $EUID -ne 0 ]; then
+  echo "Error: $(basename $0) must be run as root." >&2
+  exit 1
+fi
+# Check for a new version of MassOS.
+if [ ! -f /etc/massos-release ]; then
+  echo "Error: /etc/massos-release does not exist." >&2
+  exit 1
+elif [ "$(cat /etc/massos-release)" = "development" ]; then
+  echo "You are currently running a development branch build. This program" >&2
+  echo "will upgrade to the latest stable version of MassOS. It will be a" >&2
+  echo "DOWNGRADE if your build is newer than the latest stable version." >&2
+  echo
+  read -p "Would you still like to upgrade? [y/N] " choice
+  choice="${choice:0:1}"
+  choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+  if [ "$choice" != "y" ]; then
+    exit 1
+  fi
+  unset choice
+fi
+wdir=/var/tmp/upgrade$(date "+%Y%m%d%H%M%S")
+rm -rf /var/tmp/upgrade2*
+mkdir $wdir
+cd $wdir
+curl -Os https://raw.githubusercontent.com/TheSonicMaster/MassOS/main/utils/massos-release
+if [ $? -ne 0 ]; then
+  echo "Error: Could not check for a new release." >&2
+  rm -rf $wdir
+  exit 1
+fi
+diff /etc/massos-release massos-release &>/dev/null
+if [ $? -ne 1 ]; then
+  echo "No new release of MassOS was found."
+  rm -rf $wdir
+  exit 0
+fi
+echo "A new release of MassOS was found."
+echo
+echo "Current version: $(cat /etc/massos-release)"
+echo "New version:     $(cat massos-release)"
+echo
+echo "The changelog for this new version can be found at the following link:"
+echo
+echo "  https://github.com/TheSonicMaster/MassOS/releases/tag/v$(cat massos-release)"
+echo
+read -p "Would you like to upgrade now? [y/N] " choice
+choice="${choice:0:1}"
+choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+if [ "$choice" != "y" ]; then
+  exit 1
+fi
+unset choice
+echo "Downloading the upgrade. This may take a while..."
+curl -L "https://github.com/TheSonicMaster/MassOS/releases/download/v$(cat massos-release)/massos-$(cat massos-release)-rootfs-x86_64.tar.xz" -o massos-upgrade.tar.xz
+if [ $? -ne 0 ]; then
+  echo "Error: Could not download the upgrade." >&2
+  rm -rf $wdir
+  exit 1
+fi
+mkdir -p massos-upgrade
+printf "Preparing the upgrade. This may take a while... "
+tar -xJpf massos-upgrade.tar.xz -C massos-upgrade
+if [ $? -ne 0 ]; then
+  echo "Error: Failed to prepare the upgrade." >&2
+  rm -rf $wdir
+  exit 1
+fi
+echo "Done!"
+printf "Checking for configuration file conflicts... "
+for i in $(find massos-upgrade/etc -type f); do
+  newfile="$i"
+  existingfile="$(echo $i | sed 's/massos-upgrade//')"
+  if [ ! -e "$existingfile" ]; then
+    # New file, no need to check for differences.
+    safe="$safe $existingfile"
+  else
+    diff "$existingfile" "$newfile" &>/dev/null
+    if [ $? -eq 0 ]; then
+      safe="$safe $existingfile"
+    else
+      # Do not override local files if they are different/modified.
+      donotoverride="$donotoverride $existingfile"
+    fi
+  fi
+done
+echo "Done!"
+set -e
+printf "Installing new configuration files to /etc... "
+for i in $safe; do
+  perms=$(stat -c "%a %n" -- "massos-upgrade/$i" | cut -d" " -f1)
+  owner=$(ls -l "massos-upgrade/$i" | cut -d" " -f3)
+  group=$(ls -l "massos-upgrade/$i" | cut -d" " -f4)
+  install -o$owner -g$group -Dm$perms massos-upgrade/$i $i
+done
+for i in $donotoverride; do
+  perms=$(stat -c "%a %n" -- "massos-upgrade/$i" | cut -d" " -f1)
+  owner=$(ls -l "massos-upgrade/$i" | cut -d" " -f3)
+  group=$(ls -l "massos-upgrade/$i" | cut -d" " -f4)
+  install -o$owner -g$group -Dm$perms massos-upgrade/$i $i.new
+done
+for i in /etc/{lsb,massos,os}-release; do
+  if [ -f $i.new ]; then
+    mv $i.new $i
+  fi
+done
+echo "Done!"
+printf "Installing new kernel to /boot... "
+find massos-upgrade/boot/* -prune -type f -exec cp -af {} /boot ';'
+echo "Done!"
+# Forwards compatibility; may use /opt or /srv in the future, but we don't yet.
+if [ "$(ls -A massos-upgrade/opt)" ]; then
+  printf "Installing new files to /opt... "
+  cp -af massos-upgrade/opt /
+  echo "Done!"
+fi
+if [ "$(ls -A massos-upgrade/srv)" ]; then
+  printf "Installing new files to /srv... "
+  cp -af massos-upgrade/srv /
+  echo "Done!"
+fi
+printf "Installing new files to /var... "
+for i in $(find massos-upgrade/var -type f); do
+  existingfile="$(echo $i | sed 's/massos-upgrade//')"
+  if [ ! -e "$existingfile" ]; then
+    # Only copy new files, do not overwrite existing files.
+    perms=$(stat -c "%a %n" -- "$i" | cut -d" " -f1)
+    owner=$(ls -l "$i" | cut -d" " -f3)
+    group=$(ls -l "$i" | cut -d" " -f4)
+    install -o$owner -g$group -Dm$perms "$i" "$existingfile"
+  fi
+done
+echo "Done!"
+printf "Installing new headers to /usr/include... "
+cp -af massos-upgrade/usr/include /usr
+echo "Done!"
+printf "Installing new data files to /usr/share... "
+cp -af massos-upgrade/usr/share /usr
+echo "Done!"
+# More forwards compatibility.
+if [ "$(ls -A massos-upgrade/usr/src)" ]; then
+  printf "Installing new files to /usr/src... "
+  cp -af massos-upgrade/usr/src /usr
+  echo "Done!"
+fi
+# Entering the danger zone.
+printf "Installing new executable libraries to /usr/libexec... "
+for i in $(find massos-upgrade/usr/libexec -type f); do
+  existingfile="$(echo $i | sed 's/massos-upgrade//')"
+  perms=$(stat -c "%a %n" -- "$i" | cut -d" " -f1)
+  owner=$(ls -l "$i" | cut -d" " -f3)
+  group=$(ls -l "$i" | cut -d" " -f4)
+  install -o$owner -g$group -Dm$perms "$i" "$existingfile"
+done
+echo "Done!"
+printf "Installing new secure binaries to /usr/sbin... "
+for i in $(find massos-upgrade/usr/sbin -type f); do
+  existingfile="$(echo $i | sed 's/massos-upgrade//')"
+  perms=$(stat -c "%a %n" -- "$i" | cut -d" " -f1)
+  owner=$(ls -l "$i" | cut -d" " -f3)
+  group=$(ls -l "$i" | cut -d" " -f4)
+  install -o$owner -g$group -Dm$perms "$i" "$existingfile"
+done
+echo "Done!"
+printf "Installing new binaries to /usr/bin... "
+for i in $(find massos-upgrade/usr/bin -type f); do
+  existingfile="$(echo $i | sed 's/massos-upgrade//')"
+  perms=$(stat -c "%a %n" -- "$i" | cut -d" " -f1)
+  owner=$(ls -l "$i" | cut -d" " -f3)
+  group=$(ls -l "$i" | cut -d" " -f4)
+  install -o$owner -g$group -Dm$perms "$i" "$existingfile"
+done
+echo "Done!"
+printf "Installing new libraries to /usr/lib... "
+find massos-upgrade/usr/lib -type f > libs.txt
+while read -r line; do
+  put="$(echo $line | sed 's/massos-upgrade//')"
+  perms=$(stat -c "%a %n" -- "$line" | cut -d" " -f1)
+  owner=$(ls -l "$line" | cut -d" " -f3)
+  group=$(ls -l "$line" | cut -d" " -f4)
+  install -o$owner -g$group -Dm$perms "$line" "$put"
+done < libs.txt
+ldconfig
+echo "Done!"
+# Post installation extra-configuration stages.
+mklocales
+printf "Generating an updated initramfs... "
+KVER=$(find massos-upgrade/boot -name vmlinuz-* | sed 's/massos-upgrade\/boot\/vmlinuz-//')
+dracut -q --force /boot/initrd.img-$KVER $KVER
+echo "Done!"
+echo "Generating an updated GRUB configuration file..."
+grub-mkconfig -o /boot/grub/grub.cfg
+printf "Removing temporary upgrade files... "
+rm -rf $wdir
+echo "Done!"
+echo -e "\nMassOS has successfully been upgraded. You must now REBOOT."
