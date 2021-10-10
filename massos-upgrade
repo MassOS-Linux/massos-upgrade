@@ -25,7 +25,7 @@ fi
 if [ ! -f /etc/massos-release ]; then
   echo "Error: /etc/massos-release does not exist." >&2
   exit 1
-elif [ "$(cat /etc/massos-release)" = "development" ]; then
+elif [ -z "$1" ] && [ "$(cat /etc/massos-release)" = "development" ]; then
   echo "You are currently running a development branch build. This program" >&2
   echo "will upgrade to the latest stable version of MassOS. It will be a" >&2
   echo "DOWNGRADE if your build is newer than the latest stable version." >&2
@@ -38,54 +38,96 @@ elif [ "$(cat /etc/massos-release)" = "development" ]; then
   fi
   unset choice
 fi
-wdir=/var/tmp/upgrade$(date "+%Y%m%d%H%M%S")
+savedir="$PWD"
 rm -rf /var/tmp/upgrade2*
-mkdir $wdir
-cd $wdir
-curl -Os https://raw.githubusercontent.com/TheSonicMaster/MassOS/main/utils/massos-release
-if [ $? -ne 0 ]; then
-  echo "Error: Could not check for a new release." >&2
-  rm -rf $wdir
-  exit 1
+wdir=/var/tmp/upgrade$(date "+%Y%m%d%H%M%S")
+mkdir -p $wdir
+# If the user specifies a custom update package, use it.
+if [ ! -z "$1" ]; then
+  if [ ! -f "$1" ]; then
+    echo "Error: Specified custom update package $1 does not exist." >&2
+    rm -rf $wdir
+    exit 1
+  elif [ $(file -b "$1" | cut -d" " -f1) != "XZ" ]; then
+    echo "Error: Specified custom update package $1 is not valid." >&2
+    rm -rf $wdir
+    exit 1
+  else
+    echo "You have specified a custom upgrade package."
+    echo "This has not been verified by the MassOS developers, and a bad"
+    echo "upgrade package may render your system unusable."
+    echo
+    echo "Current version: $(cat /etc/massos-release)"
+    echo "Upgrade package: $1"
+    echo
+    read -p "Would you like to upgrade now? [y/N] " choice
+    choice="${choice:0:1}"
+    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+    if [ "$choice" != "y" ]; then
+      rm -rf $wdir
+      exit 1
+    fi
+    unset choice
+    custompkg="yes"
+  fi
+else
+  custompkg="no"
+  curl -s https://raw.githubusercontent.com/TheSonicMaster/MassOS/main/utils/massos-release -o $wdir/massos-release
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not check for a new release." >&2
+    rm -rf $wdir
+    exit 1
+  fi
+  diff /etc/massos-release $wdir/massos-release &>/dev/null
+  if [ $? -ne 1 ]; then
+    echo "No new release of MassOS was found."
+    rm -rf $wdir
+    exit 0
+  fi
+  echo "A new release of MassOS was found."
+  echo
+  echo "Current version: $(cat /etc/massos-release)"
+  echo "New version:     $(cat $wdir/massos-release)"
+  echo
+  echo "The changelog for this new version can be found at the following link:"
+  echo
+  echo "  https://github.com/TheSonicMaster/MassOS/releases/tag/v$(cat $wdir/massos-release)"
+  echo
+  read -p "Would you like to upgrade now? [y/N] " choice
+  choice="${choice:0:1}"
+  choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+  if [ "$choice" != "y" ]; then
+    rm -rf $wdir
+    exit 1
+  fi
+  unset choice
+  echo "Downloading the upgrade. This may take a while..."
+  curl -L "https://github.com/TheSonicMaster/MassOS/releases/download/v$(cat $wdir/massos-release)/massos-$(cat $wdir/massos-release)-rootfs-x86_64.tar.xz" -o $wdir/massos-upgrade.tar.xz
+  if [ $? -ne 0 ]; then
+    echo "Error: Could not download the upgrade." >&2
+    rm -rf $wdir
+    exit 1
+  fi
 fi
-diff /etc/massos-release massos-release &>/dev/null
-if [ $? -ne 1 ]; then
-  echo "No new release of MassOS was found."
-  rm -rf $wdir
-  exit 0
-fi
-echo "A new release of MassOS was found."
-echo
-echo "Current version: $(cat /etc/massos-release)"
-echo "New version:     $(cat massos-release)"
-echo
-echo "The changelog for this new version can be found at the following link:"
-echo
-echo "  https://github.com/TheSonicMaster/MassOS/releases/tag/v$(cat massos-release)"
-echo
-read -p "Would you like to upgrade now? [y/N] " choice
-choice="${choice:0:1}"
-choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
-if [ "$choice" != "y" ]; then
-  exit 1
-fi
-unset choice
-echo "Downloading the upgrade. This may take a while..."
-curl -L "https://github.com/TheSonicMaster/MassOS/releases/download/v$(cat massos-release)/massos-$(cat massos-release)-rootfs-x86_64.tar.xz" -o massos-upgrade.tar.xz
-if [ $? -ne 0 ]; then
-  echo "Error: Could not download the upgrade." >&2
-  rm -rf $wdir
-  exit 1
-fi
-mkdir -p massos-upgrade
+mkdir -p $wdir/massos-upgrade
 printf "Preparing the upgrade. This may take a while... "
-tar -xJpf massos-upgrade.tar.xz -C massos-upgrade
-if [ $? -ne 0 ]; then
-  echo "Error: Failed to prepare the upgrade." >&2
-  rm -rf $wdir
-  exit 1
+if [ "$custompkg" = "yes" ]; then
+  tar -xJpf "$1" -C $wdir/massos-upgrade
+  if [ $? -ne 0 ]; then
+    echo "Error: Failed to prepare the upgrade." >&2
+    rm -rf $wdir
+    exit 1
+  fi
+else
+  tar -xJpf $wdir/massos-upgrade.tar.xz -C $wdir/massos-upgrade
+  if [ $? -ne 0 ]; then
+    echo "Error: Failed to prepare the upgrade." >&2
+    rm -rf $wdir
+    exit 1
+  fi
 fi
 echo "Done!"
+cd $wdir
 printf "Checking for configuration file conflicts... "
 for i in $(find massos-upgrade/etc -type f); do
   newfile="$i"
@@ -207,7 +249,6 @@ printf "Generating an updated initramfs... "
 KVER=$(find massos-upgrade/boot -name vmlinuz-* | sed 's/massos-upgrade\/boot\/vmlinuz-//')
 dracut -q --force /boot/initrd.img-$KVER $KVER
 echo "Done!"
-echo "Generating an updated GRUB configuration file..."
 grub-mkconfig -o /boot/grub/grub.cfg
 printf "Removing temporary upgrade files... "
 rm -rf $wdir
