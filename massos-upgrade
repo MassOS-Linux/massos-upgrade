@@ -243,10 +243,15 @@ while read -r line; do
 done < libs.txt
 ldconfig
 echo "Done!"
+# Fix /usr/src/linux symlink.
+KVER=$(find massos-upgrade/boot -name vmlinuz-* | sed 's/massos-upgrade\/boot\/vmlinuz-//')
+if [ -L /usr/src/linux ]; then
+  rm -f /usr/src/linux
+  ln -sf ../lib/modules/$KVER/build /usr/src/linux
+fi
 # Post installation extra-configuration stages.
 mklocales
 printf "Generating an updated initramfs... "
-KVER=$(find massos-upgrade/boot -name vmlinuz-* | sed 's/massos-upgrade\/boot\/vmlinuz-//')
 dracut -q --force /boot/initrd.img-$KVER $KVER
 echo "Done!"
 grub-mkconfig -o /boot/grub/grub.cfg
