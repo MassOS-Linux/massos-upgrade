@@ -254,7 +254,7 @@ mklocales
 printf "Generating an updated initramfs... "
 dracut -q --force /boot/initrd.img-$KVER $KVER
 echo "Done!"
-grub-mkconfig -o /boot/grub/grub.cfg
+test ! -f /boot/grub/grub.cfg || grub-mkconfig -o /boot/grub/grub.cfg
 printf "Removing temporary upgrade files... "
 rm -rf $wdir
 echo "Done!"
