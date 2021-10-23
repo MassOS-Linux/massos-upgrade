@@ -53,9 +53,9 @@ if [ ! -z "$1" ]; then
     rm -rf $wdir
     exit 1
   else
-    echo "You have specified a custom upgrade package."
-    echo "This has not been verified by the MassOS developers, and a bad"
-    echo "upgrade package may render your system unusable."
+    echo "You have specified a custom upgrade package. This has not been"
+    echo "verified by the MassOS developers, and a bad upgrade package may"
+    echo "render your system unusable."
     echo
     echo "Current version: $(cat /etc/massos-release)"
     echo "Upgrade package: $1"
