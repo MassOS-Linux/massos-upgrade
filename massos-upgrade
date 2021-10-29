@@ -255,6 +255,11 @@ printf "Generating an updated initramfs... "
 dracut -q --force /boot/initrd.img-$KVER $KVER
 echo "Done!"
 test ! -f /boot/grub/grub.cfg || grub-mkconfig -o /boot/grub/grub.cfg
+# Detect and run any extra commands necessary after the upgrade.
+if [ -e massos-upgrade/tmp/postupgrade ]; then
+  echo "Running additional post-upgrade steps... "
+  . massos-upgrade/tmp/postupgrade
+fi
 printf "Removing temporary upgrade files... "
 rm -rf $wdir
 echo "Done!"
