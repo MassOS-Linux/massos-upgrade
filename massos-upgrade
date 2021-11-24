@@ -128,6 +128,11 @@ else
 fi
 echo "Done!"
 cd $wdir
+# Detect and run any extra commands necessary after the upgrade.
+if [ -e massos-upgrade/tmp/preupgrade ]; then
+  echo "Running additional pre-upgrade steps... "
+  . massos-upgrade/tmp/postupgrade
+fi
 printf "Checking for configuration file conflicts... "
 for i in $(find massos-upgrade/etc -type f); do
   newfile="$i"
@@ -140,8 +145,14 @@ for i in $(find massos-upgrade/etc -type f); do
     if [ $? -eq 0 ]; then
       safe="$safe $existingfile"
     else
-      # Do not override local files if they are different/modified.
-      donotoverride="$donotoverride $existingfile"
+      echo "$existingfile" | grep -q '/etc/skel'
+      if [ $? -eq 0 ]; then
+        # Allow overriding of skeleton files.
+        safe="$safe $existingfile"
+      else
+        # Local file is different, don't override it.
+        donotoverride="$donotoverride $existingfile"
+      fi
     fi
   fi
 done
@@ -160,11 +171,9 @@ for i in $donotoverride; do
   group=$(ls -l "massos-upgrade/$i" | cut -d" " -f4)
   install -o$owner -g$group -Dm$perms massos-upgrade/$i $i.new
 done
-for i in /etc/{lsb,massos,os}-release; do
-  if [ -f $i.new ]; then
-    mv $i.new $i
-  fi
-done
+# Remove .new files for group and password, which are dangerous to overwrite.
+rm -f /etc/{group,passwd}.new
+rm -f /etc/{group,passwd}-.new
 echo "Done!"
 printf "Installing new kernel to /boot... "
 find massos-upgrade/boot/* -prune -type f -exec cp -af {} /boot ';'
@@ -250,6 +259,11 @@ if [ -L /usr/src/linux ]; then
   ln -sf ../lib/modules/$KVER/build /usr/src/linux
 fi
 # Post installation extra-configuration stages.
+for i in /etc/{lsb,massos,os}-release; do
+  if [ -f $i.new ]; then
+    mv $i.new $i
+  fi
+done
 mklocales
 printf "Generating an updated initramfs... "
 dracut -q --force /boot/initrd.img-$KVER $KVER
