@@ -131,7 +131,7 @@ cd $wdir
 # Detect and run any extra commands necessary after the upgrade.
 if [ -e massos-upgrade/tmp/preupgrade ]; then
   echo "Running additional pre-upgrade steps... "
-  . massos-upgrade/tmp/postupgrade
+  . massos-upgrade/tmp/preupgrade
 fi
 printf "Checking for configuration file conflicts... "
 for i in $(find massos-upgrade/etc -type f); do
