@@ -171,6 +171,9 @@ for i in $donotoverride; do
   group=$(ls -l "massos-upgrade/$i" | cut -d" " -f4)
   install -o$owner -g$group -Dm$perms massos-upgrade/$i $i.new
 done
+# Ensure protocols and services are moved.
+test ! -e /etc/protocols.new || mv /etc/protocols.new /etc/protocols
+test ! -e /etc/services.new || mv /etc/services.new /etc/services
 # Remove .new files for group and password, which are dangerous to overwrite.
 rm -f /etc/{group,passwd}.new
 rm -f /etc/{group,passwd}-.new
