@@ -5,10 +5,12 @@ This is a utility which will upgrade your installed version of MassOS to the lat
 
 This utility should **ONLY** be used on a MassOS system. There is a 110% chance of it breaking your system if you try to straight-up use it on another distro. Alternatively, you could fork it and modify it if you want to use it for your own distro.
 
-If you aren't using MassOS, you can find out more about the operating system from [here](https://github.com/TheSonicMaster/MassOS). If you want to install MassOS, have a look at the [installation guide](https://github.com/TheSonicMaster/MassOS/blob/main/installation-guide.md).
+If you aren't using MassOS, you can find out more about the operating system from [here](https://massos.org). If you want to install MassOS, have a look at the [installation guide](https://github.com/MassOS-Linux/MassOS/wiki/Installing-MassOS).
 # How to upgrade
 ## Pre-upgrade notes
-This utility is only designed for upgrading an existing installation of MassOS. If you don't yet have MassOS installed, please install it normally by following the [installation guide](https://github.com/TheSonicMaster/MassOS/blob/main/installation-guide.md).
+**NOTE:** If you can, we recommend using the [Live CD upgrade method](https://github.com/MassOS-Linux/MassOS/wiki/Upgrading-MassOS#method-2---refreshing-from-the-live-cd-iso) instead of this utility. It is faster and more robust.
+
+This utility is only designed for upgrading an existing installation of MassOS. If you don't yet have MassOS installed, please install it normally by following the [installation guide](https://github.com/MassOS-Linux/MassOS/wiki/Installing-MassOS).
 
 Before upgrading, **it is highly recommended that you back up your data and have an emergency/recovery boot device available**, in case something goes wrong halfway through or the upgrade process gets unexpectedly interrupted.
 
@@ -22,7 +24,7 @@ During the upgrade:
 ## Retrieving the upgrade utility
 Run the following command to retrieve the MassOS upgrade utility:
 ```
-curl -Os https://raw.githubusercontent.com/TheSonicMaster/massos-upgrade/main/massos-upgrade
+curl -LOs https://raw.githubusercontent.com/MassOS-Linux/massos-upgrade/main/massos-upgrade
 chmod 755 massos-upgrade
 ```
 ## Run the upgrade utility

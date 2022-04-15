@@ -72,7 +72,7 @@ if [ ! -z "$1" ]; then
   fi
 else
   custompkg="no"
-  curl -s https://raw.githubusercontent.com/TheSonicMaster/MassOS/main/utils/massos-release -o $wdir/massos-release
+  curl -s https://raw.githubusercontent.com/MassOS-Linux/MassOS/main/utils/massos-release -o $wdir/massos-release
   if [ $? -ne 0 ]; then
     echo "Error: Could not check for a new release." >&2
     rm -rf $wdir
@@ -91,7 +91,7 @@ else
   echo
   echo "The changelog for this new version can be found at the following link:"
   echo
-  echo "  https://github.com/TheSonicMaster/MassOS/releases/tag/v$(cat $wdir/massos-release)"
+  echo "  https://github.com/MassOS-Linux/MassOS/releases/tag/v$(cat $wdir/massos-release)"
   echo
   read -p "Would you like to upgrade now? [y/N] " choice
   choice="${choice:0:1}"
