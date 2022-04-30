@@ -102,7 +102,7 @@ else
   fi
   unset choice
   echo "Downloading the upgrade. This may take a while..."
-  curl -L "https://github.com/TheSonicMaster/MassOS/releases/download/v$(cat $wdir/massos-release)/massos-$(cat $wdir/massos-release)-rootfs-x86_64.tar.xz" -o $wdir/massos-upgrade.tar.xz
+  curl -L "https://github.com/MassOS-Linux/MassOS/releases/download/v$(cat $wdir/massos-release)/massos-$(cat $wdir/massos-release)-rootfs-x86_64.tar.xz" -o $wdir/massos-upgrade.tar.xz
   if [ $? -ne 0 ]; then
     echo "Error: Could not download the upgrade." >&2
     rm -rf $wdir
