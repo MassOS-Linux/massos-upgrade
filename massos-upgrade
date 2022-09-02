@@ -118,6 +118,22 @@ else
     exit 1
   fi
 fi
+# Download and prepare upgrade toolset.
+echo "Retrieving upgrade toolset..."
+curl -L https://github.com/MassOS-Linux/upgrade-toolset/releases/download/20220902/upgrade-toolset-20220902-x86_64.tar.xz -o $wdir/toolset.tar.xz
+mkdir -p $wdir/toolset
+tar -xf $wdir/toolset.tar.xz -C $wdir/toolset --strip-components=1
+if [ $? -ne 0 ]; then
+  echo "Warning: Could not set up upgrade toolset. The upgrade may fail" >&2
+  read -p "and break your system without it. Do you want to proceed? [y/N] " ch6
+  if [ "$ch6" != "y" ]; then
+    rm -rf $wdir
+    exit 1
+  fi
+  unset ch5
+fi
+export PATH="$wdir/toolset:$PATH"
+# Prepare the upgrade.
 mkdir -p $wdir/massos-upgrade
 printf "Preparing the upgrade. This may take a while... "
 if [ "$custompkg" = "yes" ]; then
