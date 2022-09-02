@@ -44,8 +44,8 @@ if [ -e /usr/share/xsessions/xfce.desktop ]; then
 elif [ -e /usr/share/wayland-sessions/gnome-wayland.desktop ]; then
   flavour="gnome"
 else
-  echo "Desktop Environment not supported"
-  exit
+  echo "Error: A supported desktop environment was not found." >&2
+  exit 1
 fi
 savedir="$PWD"
 rm -rf /var/tmp/upgrade2*
